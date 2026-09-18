@@ -4,6 +4,37 @@ A local browser experiment for streaming OpenAI Live speech, applying a near-ult
 
 The transmitter and receiver are independent: use both on one computer, or open receiver mode on one device while playing saved audio from another.
 
+![Audio Watermark Lab running in combined transmitter and receiver mode](public/audio-watermark-lab.png)
+
+## Why this exists
+
+This experiment was inspired by an [Instagram post about multiple mobile AI agents speaking to each other](https://www.instagram.com/p/Dbj6mf-Rscq/). It asks a practical question: if AI voice output crosses a room and becomes another agent's microphone input, can the receiving application recognize that it is hearing synthesized agent speech and apply a policy before treating it as ordinary human input?
+
+The prototype does not claim to solve provenance. It demonstrates the signal-processing loop: generate speech, insert a known acoustic pattern before speaker output, capture it with a microphone, and distinguish that pattern from ordinary target-frequency noise.
+
+## What the screen shows
+
+The screenshot uses combined mode:
+
+- **Transmitter** creates a one-shot OpenAI Live response from the script, routes the decoded remote track through the browser's audio processor, and optionally adds the watermark before output reaches the speakers.
+- **Live output spectrum** is the post-processing signal. The narrow peak at the highlighted 18 kHz target is the injected carrier; lower-frequency content is the generated speech.
+- **Receiver** reads an independent microphone stream. Its spectrum shows what actually survived the speaker-to-microphone path, rather than reusing the transmitter's source buffer.
+- **Carrier present** means the microphone sees elevated energy at the configured target frequency. **Watermark detected** requires that energy to follow the expected repeated 17-chip on/off pattern as well.
+- Turning off **Inject watermark into live output** provides the clean control: speech continues playing, but the carrier is not inserted and the receiver should remain unlocked.
+
+## Signal path
+
+```text
+Script
+  -> local server creates OpenAI Live WebRTC session
+  -> browser receives decoded remote audio
+  -> watermark mixer (clean bypass or 15–20 kHz chip sequence)
+  -> browser speakers
+  -> air / room / microphone
+  -> receiver spectrum + carrier test + chip-pattern correlation
+  -> carrier state or payload lock
+```
+
 ## Run locally
 
 1. Copy `.env.example` to `.env` and add your OpenAI API key.
@@ -25,7 +56,9 @@ The API key stays in the local server and is never sent to browser code.
 
 ## Architecture
 
-`AudioSourceProvider` isolates encoded batch generation from watermark processing. `StreamingAudioSourceProvider` is the parallel boundary for Live/Realtime providers. Both converge on normalized PCM: `normalizePcmChunk` converts interleaved signed-16 or float32 chunks to per-channel floats, and `mixWatermarkChannel` accepts a chunk plus its absolute sample offset. Playback, visualization, and receiver analysis remain downstream from that stage.
+`AudioSourceProvider` isolates encoded batch generation from watermark processing. `StreamingAudioSourceProvider` is the parallel boundary for providers that deliver PCM chunks, while `LiveAudioSourceProvider` manages the WebRTC session and routes its decoded remote track into the same watermark mixer. Both converge on normalized PCM: `normalizePcmChunk` converts interleaved signed-16 or float32 chunks to per-channel floats, and `mixWatermarkChannel` accepts a chunk plus its absolute sample offset. Playback, visualization, and receiver analysis remain downstream from that stage.
+
+The local Express server creates the OpenAI Live session with `OPENAI_API_KEY`; browser code receives only the WebRTC answer and never the standard OpenAI credential.
 
 ## Experiment procedure
 
