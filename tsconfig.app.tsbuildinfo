@@ -1,0 +1,1 @@
+{"root":["./src/app.tsx","./src/main.tsx","./src/audio/types.ts","./src/audio/watermark.ts","./src/audio/providers/openairealtime.ts","./src/audio/providers/openaitts.ts","./src/components/receiverpanel.tsx","./src/components/signalcanvas.tsx","./src/components/sourcepanel.tsx"],"version":"5.9.3"}
